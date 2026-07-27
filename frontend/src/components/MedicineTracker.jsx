@@ -1,3 +1,4 @@
+import { useAuth } from '../context/AuthContext';
 import { useEffect, useState, useRef } from 'react';
 import api from '../services/api';
 
@@ -24,7 +25,8 @@ export default function MedicineTracker({ residentId }) {
   const [form, setForm] = useState({ med_name: '', dosage: '', time_of_day: '' });
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ med_name: '', dosage: '', time_of_day: '', frequency: 'daily' });
-  const { role } = JSON.parse(localStorage.getItem('user') || '{}');
+  const { user } = useAuth();
+const role = user?.role;
   const intervalRef = useRef(null);
 
   useEffect(() => {
