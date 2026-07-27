@@ -8,5 +8,7 @@ router.get('/:residentId', verifyToken, medicineController.getMedicinesByResiden
 router.get('/:residentId/today', verifyToken, medicineController.getTodayLog);
 router.get('/:residentId/adherence', verifyToken, medicineController.getAdherenceStats);
 router.patch('/log/:logId', verifyToken, medicineController.markDoseStatus);
+router.patch('/:id', verifyToken, allowRoles('staff'), medicineController.updateMedicine);
+router.delete('/:id', verifyToken, allowRoles('staff'), medicineController.deleteMedicine);
 
 module.exports = router;

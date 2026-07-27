@@ -18,8 +18,8 @@ export default function Intro({ onComplete }) {
       <svg className="pulse-svg" viewBox="0 0 800 300" preserveAspectRatio="xMidYMid meet">
         <defs>
           <radialGradient id="sunGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#E3A857" stopOpacity="0.9" />
-            <stop offset="100%" stopColor="#E3A857" stopOpacity="0" />
+            <stop offset="0%" stopColor="#D98B3D" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="#D98B3D" stopOpacity="0" />
           </radialGradient>
         </defs>
 
@@ -29,7 +29,7 @@ export default function Intro({ onComplete }) {
           className="sunrise-arc"
           d="M 250 230 A 150 150 0 0 1 550 230"
           fill="none"
-          stroke="#E3A857"
+          stroke="#D98B3D"
           strokeWidth="3"
         />
         <line className="horizon" x1="150" y1="230" x2="650" y2="230" stroke="#2A3B52" strokeWidth="1.5" />
@@ -39,7 +39,7 @@ export default function Intro({ onComplete }) {
           className="pulse-line"
           d="M 40 150 L 220 150 L 260 90 L 300 210 L 340 60 L 380 150 L 420 150 L 460 130 L 500 150 L 760 150"
           fill="none"
-          stroke="#F1F4F0"
+          stroke="#F2F5F7"
           strokeWidth="3.5"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -48,7 +48,7 @@ export default function Intro({ onComplete }) {
 
       <div className="intro-brand">
         <h1>Hearth</h1>
-        <p>AI-guided care, watching over every golden year</p>
+        <p>Continuous, intelligent monitoring for every resident</p>
       </div>
 
       <button className="intro-skip" onClick={skip}>Skip →</button>

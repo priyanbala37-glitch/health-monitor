@@ -23,11 +23,9 @@ exports.getAllResidents = async (req, res) => {
 
     const withStatus = await Promise.all(
       residents.map(async (r) => {
-        // Manual override always wins if set
         if (r.status_override && r.status_override !== 'auto') {
           return { ...r, status: r.status_override };
         }
-
         const [[{ highCount }]] = await db.query(
           `SELECT COUNT(*) AS highCount FROM alerts WHERE resident_id = ? AND resolved = FALSE AND severity = 'high'`,
           [r.id]
@@ -36,11 +34,9 @@ exports.getAllResidents = async (req, res) => {
           `SELECT COUNT(*) AS medCount FROM alerts WHERE resident_id = ? AND resolved = FALSE AND severity = 'medium'`,
           [r.id]
         );
-
         let status = 'normal';
         if (highCount > 0) status = 'critical';
         else if (medCount > 0) status = 'watch';
-
         return { ...r, status };
       })
     );
@@ -87,11 +83,10 @@ exports.updateResident = async (req, res) => {
   }
 };
 
-// Manually set (or clear) a resident's status
 exports.setStatusOverride = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status_override } = req.body; // 'auto' | 'normal' | 'watch' | 'critical'
+    const { status_override } = req.body;
 
     if (!['auto', 'normal', 'watch', 'critical'].includes(status_override)) {
       return res.status(400).json({ message: 'Invalid status value' });
@@ -102,5 +97,31 @@ exports.setStatusOverride = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Error updating status' });
+  }
+};
+
+// Deletes a resident and everything linked to them, in the correct order
+// to satisfy foreign key constraints (children before parent).
+exports.deleteResident = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [existing] = await db.query('SELECT id FROM residents WHERE id = ?', [id]);
+    if (existing.length === 0) return res.status(404).json({ message: 'Resident not found' });
+
+    await db.query('DELETE FROM alerts WHERE resident_id = ?', [id]);
+    await db.query('DELETE FROM vitals_log WHERE resident_id = ?', [id]);
+    await db.query('DELETE FROM family_members WHERE resident_id = ?', [id]);
+    await db.query(
+      `DELETE ml FROM medicine_log ml JOIN medicines m ON ml.medicine_id = m.id WHERE m.resident_id = ?`,
+      [id]
+    );
+    await db.query('DELETE FROM medicines WHERE resident_id = ?', [id]);
+    await db.query('DELETE FROM residents WHERE id = ?', [id]);
+
+    res.json({ message: 'Resident and all related records deleted' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error deleting resident' });
   }
 };

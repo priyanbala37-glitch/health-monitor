@@ -1,25 +1,15 @@
 const db = require('../config/db');
 
-// Ensures a medicine_log row exists for every medicine of this resident,
-// for a given date. If it's today, the row starts as 'pending'. If it's
-// a past date with no record, it's treated as 'missed' (no action was
-// ever taken, so we can't assume it was given).
 async function ensureLogsForDate(residentId, dateStr, isToday) {
-  const [medicines] = await db.query(
-    'SELECT id FROM medicines WHERE resident_id = ?',
-    [residentId]
-  );
-
+  const [medicines] = await db.query('SELECT id FROM medicines WHERE resident_id = ?', [residentId]);
   for (const med of medicines) {
     const [existing] = await db.query(
       'SELECT id FROM medicine_log WHERE medicine_id = ? AND scheduled_date = ?',
       [med.id, dateStr]
     );
-
     if (existing.length === 0) {
       await db.query(
-        `INSERT INTO medicine_log (medicine_id, scheduled_date, status)
-         VALUES (?, ?, ?)`,
+        `INSERT INTO medicine_log (medicine_id, scheduled_date, status) VALUES (?, ?, ?)`,
         [med.id, dateStr, isToday ? 'pending' : 'missed']
       );
     }
@@ -58,11 +48,47 @@ exports.getMedicinesByResident = async (req, res) => {
   }
 };
 
+// Update an existing medicine's name, dosage, time, or frequency.
+// This changes the schedule going forward; today's log entry keeps its
+// existing status, but the displayed name/time updates immediately.
+exports.updateMedicine = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { med_name, dosage, time_of_day, frequency } = req.body;
+
+    if (!med_name || !time_of_day) {
+      return res.status(400).json({ message: 'med_name and time_of_day are required' });
+    }
+
+    await db.query(
+      `UPDATE medicines SET med_name = ?, dosage = ?, time_of_day = ?, frequency = ? WHERE id = ?`,
+      [med_name, dosage || null, time_of_day, frequency || 'daily', id]
+    );
+
+    res.json({ message: 'Medicine updated' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error updating medicine' });
+  }
+};
+
+// Deletes a medicine and its full log history.
+exports.deleteMedicine = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.query('DELETE FROM medicine_log WHERE medicine_id = ?', [id]);
+    await db.query('DELETE FROM medicines WHERE id = ?', [id]);
+    res.json({ message: 'Medicine deleted' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error deleting medicine' });
+  }
+};
+
 exports.getTodayLog = async (req, res) => {
   try {
     const { residentId } = req.params;
     const today = formatDate(new Date());
-
     await ensureLogsForDate(residentId, today, true);
 
     const [rows] = await db.query(
@@ -115,13 +141,9 @@ exports.markDoseStatus = async (req, res) => {
   }
 };
 
-// Adherence % per day for the last 7 days.
-// Backfills missing log rows first (as 'missed'), so the chart always
-// has real data instead of staying empty.
 exports.getAdherenceStats = async (req, res) => {
   try {
     const { residentId } = req.params;
-
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -130,14 +152,10 @@ exports.getAdherenceStats = async (req, res) => {
     }
 
     const [rows] = await db.query(
-      `SELECT ml.scheduled_date,
-              SUM(ml.status = 'taken') AS taken,
-              COUNT(*) AS total
-       FROM medicine_log ml
-       JOIN medicines m ON ml.medicine_id = m.id
+      `SELECT ml.scheduled_date, SUM(ml.status = 'taken') AS taken, COUNT(*) AS total
+       FROM medicine_log ml JOIN medicines m ON ml.medicine_id = m.id
        WHERE m.resident_id = ? AND ml.scheduled_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
-       GROUP BY ml.scheduled_date
-       ORDER BY ml.scheduled_date`,
+       GROUP BY ml.scheduled_date ORDER BY ml.scheduled_date`,
       [residentId]
     );
 

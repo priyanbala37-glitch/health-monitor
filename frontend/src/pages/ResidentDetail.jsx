@@ -23,9 +23,7 @@ export default function ResidentDetail() {
   const fetchData = async () => {
     const res = await api.get(`/residents/${id}`);
     setResident(res.data.resident);
-
-    const vitalsRes = await api.get(`/vitals/${id}`);
-    setVitals(vitalsRes.data);
+    setVitals((await api.get(`/vitals/${id}`)).data);
 
     const all = await api.get('/residents');
     const match = all.data.find((r) => String(r.id) === String(id));
@@ -41,6 +39,12 @@ export default function ResidentDetail() {
 
   const triggerFall = async () => {
     await api.post('/alerts/fall', { resident_id: id });
+  };
+
+  const deleteResident = async () => {
+    if (!window.confirm(`Delete ${resident.name} and all their records (vitals, medicines, alerts)? This cannot be undone.`)) return;
+    await api.delete(`/residents/${id}`);
+    navigate('/staff');
   };
 
   const downloadSummary = () => {
@@ -106,6 +110,9 @@ export default function ResidentDetail() {
           <button className="btn-warning" onClick={triggerFall}>Simulate Fall Detected</button>
         )}
         <button className="btn-secondary" onClick={downloadSummary}>Download Health Summary PDF</button>
+        {user.role === 'staff' && (
+          <button className="btn-warning" onClick={deleteResident}>Delete Resident</button>
+        )}
       </div>
 
       <div className="detail-grid">
