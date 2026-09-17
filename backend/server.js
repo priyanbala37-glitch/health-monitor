@@ -43,3 +43,7 @@ server.listen(PORT, () => {
   startReminderScheduler(io);
   console.log('⏰ Medicine reminder scheduler started (checks every 60s)');
 });
+
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled rejection:', err);
+});

@@ -12,6 +12,10 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
+pool.on('error', (err) => {
+  console.error('MySQL pool error:', err.message);
+});
+
 const promisePool = pool.promise();
 
 module.exports = promisePool;

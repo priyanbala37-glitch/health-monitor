@@ -36,54 +36,60 @@ async function ensureTodayLogsForAllResidents() {
 // Finds every still-pending dose for today, and if the grace period has
 // passed, marks it 'missed' and raises a real alert (broadcast live too).
 async function checkOverdueMedicines(io) {
-  await ensureTodayLogsForAllResidents();
+  try {
+    await ensureTodayLogsForAllResidents();
 
-  const [pending] = await db.query(
-    `SELECT ml.id AS log_id, m.med_name, m.time_of_day, m.resident_id, r.name AS resident_name
-     FROM medicine_log ml
-     JOIN medicines m ON ml.medicine_id = m.id
-     JOIN residents r ON m.resident_id = r.id
-     WHERE ml.status = 'pending' AND ml.scheduled_date = CURDATE()`
-  );
+    const [pending] = await db.query(
+      `SELECT ml.id AS log_id, m.med_name, m.time_of_day, m.resident_id, r.name AS resident_name
+       FROM medicine_log ml
+       JOIN medicines m ON ml.medicine_id = m.id
+       JOIN residents r ON m.resident_id = r.id
+       WHERE ml.status = 'pending' AND ml.scheduled_date = CURDATE()`
+    );
 
-  const now = new Date();
+    const now = new Date();
 
-  for (const row of pending) {
-    const [h, m] = row.time_of_day.split(':').map(Number);
-    const scheduled = new Date();
-    scheduled.setHours(h, m, 0, 0);
-    const graceDeadline = new Date(scheduled.getTime() + GRACE_MINUTES * 60000);
+    for (const row of pending) {
+      const [h, m] = row.time_of_day.split(':').map(Number);
+      const scheduled = new Date();
+      scheduled.setHours(h, m, 0, 0);
+      const graceDeadline = new Date(scheduled.getTime() + GRACE_MINUTES * 60000);
 
-    if (now > graceDeadline) {
-      await db.query(`UPDATE medicine_log SET status = 'missed', marked_at = NOW() WHERE id = ?`, [row.log_id]);
+      if (now > graceDeadline) {
+        await db.query(`UPDATE medicine_log SET status = 'missed', marked_at = NOW() WHERE id = ?`, [row.log_id]);
 
-      const message = `Missed dose: ${row.med_name} (was due ${row.time_of_day.slice(0, 5)})`;
-      const [alertResult] = await db.query(
-        `INSERT INTO alerts (resident_id, type, message, severity) VALUES (?, 'missed_medicine', ?, 'medium')`,
-        [row.resident_id, message]
-      );
+        const message = `Missed dose: ${row.med_name} (was due ${row.time_of_day.slice(0, 5)})`;
+        const [alertResult] = await db.query(
+          `INSERT INTO alerts (resident_id, type, message, severity) VALUES (?, 'missed_medicine', ?, 'medium')`,
+          [row.resident_id, message]
+        );
 
-      if (io) {
-        io.emit('new_alert', {
-          id: alertResult.insertId,
-          resident_id: row.resident_id,
-          resident_name: row.resident_name,
-          type: 'missed_medicine',
-          message,
-          severity: 'medium',
-          created_at: new Date()
-        });
+        if (io) {
+          io.emit('new_alert', {
+            id: alertResult.insertId,
+            resident_id: row.resident_id,
+            resident_name: row.resident_name,
+            type: 'missed_medicine',
+            message,
+            severity: 'medium',
+            created_at: new Date()
+          });
+        }
+
+        console.log(`⏰ Auto-marked missed: ${row.med_name} for ${row.resident_name}`);
       }
-
-      console.log(`⏰ Auto-marked missed: ${row.med_name} for ${row.resident_name}`);
     }
+  } catch (err) {
+    console.error('⚠️ Reminder scheduler tick failed, will retry in 60s:', err.message);
   }
 }
 
-// Call this once when the server starts. Runs an immediate check,
-// then repeats every 60 seconds for as long as the server is running.
+// Call this once when the server starts. Waits 5s to let the DB proxy
+// settle after boot, then repeats every 60 seconds for as long as the
+// server is running. Errors inside a tick are caught above, so one bad
+// connection blip never crashes the whole process.
 function startReminderScheduler(io) {
-  checkOverdueMedicines(io);
+  setTimeout(() => checkOverdueMedicines(io), 5000);
   setInterval(() => checkOverdueMedicines(io), 60 * 1000);
 }
 
