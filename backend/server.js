@@ -15,10 +15,10 @@ const assistantRoutes = require('./routes/assistantRoutes');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+const io = new Server(server, { cors: { origin: 'https://health-monitor-liart-one.vercel.app' } });
 app.set('io', io);
 
-app.use(cors());
+app.use(cors({ origin: 'https://health-monitor-liart-one.vercel.app' }));
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
