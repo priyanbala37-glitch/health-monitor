@@ -1,3 +1,6 @@
+const mysql = require('mysql2');
+require('dotenv').config();
+
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   port: process.env.DB_PORT || 3306,
@@ -10,3 +13,11 @@ const pool = mysql.createPool({
   enableKeepAlive: true,
   keepAliveInitialDelay: 10000
 });
+
+pool.on('error', (err) => {
+  console.error('MySQL pool error:', err.message);
+});
+
+const promisePool = pool.promise();
+
+module.exports = promisePool;
